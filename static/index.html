@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css"
+      integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ"
+      crossorigin="anonymous"
+    />
+    <title>Word Guess PVP - Demo</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script
+      src="https://cdn.socket.io/4.3.2/socket.io.min.js"
+      integrity="sha384-KAZ4DtjNhLChOB/hxXuKqhMLYvx3b5MlT55xPEiNmREKRzeEm+RVPlTnAn0ajQNs"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div id="app" class="container">
+      <div class="row">
+        <div class="col-md-6 offset-md-3 col-sm-12">
+          <input
+            :disabled="game"
+            type="text"
+            v-model="playerName"
+            class="form-control"
+            placeholder="Player Name"
+          />
+          <input
+            :disabled="game"
+            type="text"
+            v-model="gameUuid"
+            class="form-control"
+            placeholder="Game ID"
+          />
+        </div>
+        <button class="btn" @click.prevent="joinGame">
+          {{ gameUuid ? 'Join': 'Create'}} Game
+        </button>
+      </div>
+      <br />
+
+      <div v-if="game">
+        <h3>Game</h3>
+        <pre><code>{{ JSON.stringify(game, null, 2) }}</code></pre>
+
+        <h3>Player</h3>
+        <pre><code>{{ JSON.stringify(player, null, 2) }}</code></pre>
+
+        <h3>Token</h3>
+        <pre><code>{{ token }}</code></pre>
+
+        <h3>Events</h3>
+        <pre v-for="event of events"><code>{{ event }}</code></pre>
+
+        <br />
+        <hr />
+        <br />
+
+        <button
+          v-if="game.host.id === player.id"
+          :disabled="gameHasStarted"
+          class="btn"
+          @click.prevent="startGame"
+        >
+          Start Game
+        </button>
+        <p v-if="game.host.id !== player.id && !gameHasStarted">
+          waiting for host to start the game...
+        </p>
+        <br />
+
+        <div v-if="gameHasStarted && game.state == 'ACTIVE'" class="row">
+          <div class="col-md-3 offset-md-3 col-sm-12">
+            <input
+              maxlength="5"
+              type="text"
+              v-model="guessWord"
+              class="form-control"
+              placeholder="Guess Word"
+            />
+          </div>
+          <button class="btn" @click.prevent="makeGuess">Guess Word</button>
+        </div>
+        <br />
+      </div>
+    </div>
+
+    <script src="main.js"></script>
+  </body>
+</html>

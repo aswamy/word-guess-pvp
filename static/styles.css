@@ -1,0 +1,6 @@
+pre {
+  max-height: 500px;
+  overflow-y: auto;
+  background-color: #ececec;
+  padding: 5px;
+}
