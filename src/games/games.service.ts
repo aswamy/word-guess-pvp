@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Player } from './entities/player.entity';
 import { Game } from './entities/game.entity';
+import { generateRoomCode } from '../utils/generateRoomCode';
 
 const fs = require('fs');
 
@@ -27,8 +28,14 @@ export class GamesService {
   private readonly games: Map<string, Game> = new Map();
 
   createGame(player: Player): Game {
-    const g = new Game(player);
-    this.games.set(g.id, g);
+    let roomCode = generateRoomCode();
+
+    while (this.games.has(roomCode)) {
+      roomCode = generateRoomCode();
+    }
+
+    const g = new Game(roomCode, player);
+    this.games.set(roomCode, g);
 
     return g;
   }
@@ -108,8 +115,9 @@ export class GamesService {
     const game = this.findOne(id);
 
     if (WordFactory.allWords.has(guess) && game) {
-      game.rounds.get(roundId).addGuess(playerId, guess);
-      return GuessValidity.valid;
+      if (game.rounds.get(roundId).addGuess(playerId, guess)) {
+        return GuessValidity.valid;
+      }
     }
 
     return GuessValidity.invalid;

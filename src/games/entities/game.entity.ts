@@ -1,7 +1,6 @@
-import { v4 as uuidv4 } from 'uuid';
 import { Player } from './player.entity';
 import { Round, RoundState } from './round.entity';
-import { Transform } from 'class-transformer';
+import { Exclude, Transform } from 'class-transformer';
 
 const MAX_ROUNDS = 3;
 
@@ -17,16 +16,21 @@ export class Game {
   state: GameState;
   currentRound: Round;
 
+  @Exclude()
+  currentRoundTimeout: NodeJS.Timeout;
+
   @Transform(({ value }) => value.size)
   rounds: Map<string, Round>;
 
   @Transform(({ value }) => Object.fromEntries(value))
   players: Map<string, Player>;
 
-  constructor(host: Player) {
-    this.id = uuidv4();
+  constructor(roomCode: string, host: Player) {
+    this.id = roomCode;
     this.host = host;
+
     this.currentRound = null;
+    this.currentRoundTimeout = null;
 
     this.state = GameState.lobby;
 
@@ -54,8 +58,21 @@ export class Game {
       this.currentRound.state = RoundState.finished;
     }
 
+    if (this.currentRoundTimeout) {
+      clearTimeout(this.currentRoundTimeout);
+    }
+    this.currentRoundTimeout = null;
+
     if (this.rounds.size >= MAX_ROUNDS) {
       this.state = GameState.finished;
     }
+  }
+
+  arePlayersStillGuessing() {
+    if (!this.currentRound) return false;
+    if (this.currentRound.state === RoundState.finished) return false;
+
+    return [...this.players.values()]
+      .some(player => this.currentRound.isPlayerStillGuessing(player.id));
   }
 }

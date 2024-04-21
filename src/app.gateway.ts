@@ -13,15 +13,14 @@ import { GamesService, GuessValidity } from './games/games.service';
 import { instanceToPlain } from 'class-transformer';
 import { GameState } from './games/entities/game.entity';
 
-@WebSocketGateway({
+@WebSocketGateway(3003, {
   cors: {
     origin: '*',
   },
 })
 export class AppGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
-{
-  constructor(private readonly gamesService: GamesService) {}
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+  constructor(private readonly gamesService: GamesService) { }
 
   @WebSocketServer() server: Server;
   private logger: Logger = new Logger('AppGateway');
@@ -62,7 +61,10 @@ export class AppGateway
 
     if (this.gamesService.isAuthorizedHostOfGame(token, gameId)) {
       this.gamesService.startGame(gameId);
-      this.startRound(gameId);
+
+      setTimeout(() => {
+        this.startRound(gameId);
+      }, 3_000);
     }
   }
 
@@ -99,8 +101,13 @@ export class AppGateway
           validity: guessValidity,
         });
 
-        if (guessValidity == GuessValidity.valid) {
+        if (guessValidity === GuessValidity.valid) {
           this.sendDataToRoom(gameId, 'guessMade', game);
+        }
+
+        // check the game and every player to see if they already hit max guesses
+        if (!game.arePlayersStillGuessing()) {
+          this.handleEndRound(game.id);
         }
       }
     }
@@ -115,9 +122,17 @@ export class AppGateway
 
     if (client.data.gameId) {
       if (client.data.playerId) {
-        this.sendDataToRoom(client.data.gameId, 'playerLeft', {
-          playerId: client.data.playerId,
-        });
+        const game = this.gamesService.findOne(client.data.gameId);
+
+        if (game) {
+          game.players.delete(client.data.playerId);
+
+          this.sendDataToRoom(client.data.gameId, 'playerLeft', {
+            playerId: client.data.playerId,
+          });
+
+          this.handleEndRound(game.id);
+        }
       }
 
       const clientSocketIds = await this.server
@@ -139,21 +154,30 @@ export class AppGateway
 
     this.sendDataToRoom(gameId, 'roundBegan', game);
 
-    setTimeout(() => {
-      const game = this.gamesService.endRound(gameId);
-      const { answer } = game.currentRound;
+    game.currentRoundTimeout = setTimeout(() => {
+      this.handleEndRound(gameId);
+    }, 30_000);
+  }
 
-      this.sendDataToRoom(gameId, 'roundEnded', {
-        game,
-        answer,
-      });
+  private handleEndRound(gameId: string) {
+    const game = this.gamesService.endRound(gameId);
 
-      if (game.state === GameState.finished) {
-        this.sendDataToRoom(gameId, 'gameEnded', game);
-      } else {
+    if (!game.currentRound) return;
+
+    const { answer } = game.currentRound;
+
+    this.sendDataToRoom(gameId, 'roundEnded', {
+      game,
+      answer,
+    });
+
+    if (game.state === GameState.finished) {
+      this.sendDataToRoom(gameId, 'gameEnded', game);
+    } else {
+      setTimeout(() => {
         this.startRound(gameId);
-      }
-    }, 60_000);
+      }, 10_000);
+    }
   }
 
   private sendDataToRoom(roomId: string, title: string, data: any) {

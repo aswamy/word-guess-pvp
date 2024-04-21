@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Player } from './player.entity';
 import { ProductionExclude } from '../../utility';
-import { Expose } from 'class-transformer';
+import { Exclude, Expose } from 'class-transformer';
 
 const MAX_GUESSES = 6;
 
@@ -23,7 +23,7 @@ export class Round {
   @ProductionExclude()
   answer: string;
 
-  @ProductionExclude()
+  @Exclude()
   playerGuesses: Map<string, Array<string>> = new Map();
 
   state: RoundState;
@@ -45,14 +45,14 @@ export class Round {
       console.error(
         `Round#${this.id} is already finished for Game#${this.gameId}`,
       );
-      return;
+      return false;
     }
 
     if (!this.playerGuesses.has(playerId)) {
       console.error(
         `Player#${playerId} does not belong to Game#${this.gameId}`,
       );
-      return;
+      return false;
     }
 
     const guesses = this.playerGuesses.get(playerId);
@@ -64,7 +64,9 @@ export class Round {
       guessesCount < MAX_GUESSES
     ) {
       guesses.push(guess);
+      return true;
     }
+    return false;
   }
 
   @Expose()
@@ -82,12 +84,12 @@ export class Round {
 
   @Expose()
   get guessHints() {
-    const hintsPerPlayer = {};
+    const hintsPerPlayer: { [key: string]: GuessHint[][] } = {};
     for (const [playerId, guesses] of this.playerGuesses) {
       hintsPerPlayer[playerId] = [];
       for (const guess of guesses) {
         const guessLetters = guess.split('');
-        const guessHint = [];
+        const guessHint: GuessHint[] = [];
         for (let i = 0; i < this.answer.length; i++) {
           if (guessLetters[i] == this.answer[i]) {
             guessHint.push(GuessHint.found);
@@ -97,9 +99,17 @@ export class Round {
             guessHint.push(GuessHint.none);
           }
         }
-        hintsPerPlayer[playerId].push(guessHint);
+        (hintsPerPlayer[playerId]).push(guessHint);
       }
     }
     return hintsPerPlayer;
+  }
+
+  isPlayerStillGuessing(playerId: string): boolean {
+    const playerGuesses = this.guessHints[playerId];
+
+    return (playerGuesses.length < MAX_GUESSES &&
+      playerGuesses[playerGuesses.length - 1].some((hint) => hint !== GuessHint.found)
+    );
   }
 }

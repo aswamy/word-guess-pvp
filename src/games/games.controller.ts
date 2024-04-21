@@ -18,12 +18,13 @@ enum ErrorCodes {
 
 @Controller('games')
 export class GamesController {
-  constructor(private readonly gamesService: GamesService) {}
+  constructor(private readonly gamesService: GamesService) { }
 
   @Post('new')
   createGame(@Body() { playerName }: { playerName: string }) {
     const player = new Player(playerName);
 
+    // If no websocket connection is made within x seconds, we might want to delete the room?
     return {
       game: this.gamesService.createGame(player),
       player,
@@ -36,18 +37,16 @@ export class GamesController {
     @Body() { playerName }: { playerName: string },
     @Param('id') id: string,
   ) {
-    if (!uuidValidate(id)) {
-      throw new BadRequestException(ErrorCodes.INVALID_GAME_ID);
-    }
-
+    let game;
     const player = new Player(playerName);
 
-    let game = this.gamesService.findOne(id);
+    if (id) {
+      game = this.gamesService.findOne(id);
 
-    if (game) {
-      if (game.state != GameState.lobby) {
-        throw new BadRequestException(ErrorCodes.GAME_IN_PROGRESS);
+      if (!game || game.state !== GameState.lobby) {
+        throw new BadRequestException(ErrorCodes.INVALID_GAME_ID);
       }
+
       game.players.set(player.id, player);
     } else {
       game = this.gamesService.createGame(player);
